@@ -11,16 +11,16 @@ import (
 )
 
 const (
-	Author               = "webdevops.io"
-	Version              = "0.1.0"
+	Author  = "webdevops.io"
+	Version = "0.1.0"
 )
 
 var (
-	argparser            *flags.Parser
-	args                 []string
-	Verbose              bool
-	Logger               *DaemonLogger
-	PagerDutyClient      *pagerduty.Client
+	argparser       *flags.Parser
+	args            []string
+	Verbose         bool
+	Logger          *DaemonLogger
+	PagerDutyClient *pagerduty.Client
 )
 
 var opts struct {
@@ -28,10 +28,10 @@ var opts struct {
 	Verbose []bool `long:"verbose" short:"v"        env:"VERBOSE"                description:"Verbose mode"`
 
 	// server settings
-	ServerBind     string        `long:"bind"               env:"SERVER_BIND"            description:"Server address"                                     default:":8080"`
+	ServerBind string `long:"bind"               env:"SERVER_BIND"            description:"Server address"                                     default:":8080"`
 
 	// PagerDuty settings
-	PagerDutyAuthToken                 string        `long:"pagerduty.authtoken"                                         env:"PAGERDUTY_AUTH_TOKEN"                         description:"PagerDuty auth token" required:"true"`
+	PagerDutyAuthToken string `long:"pagerduty.authtoken"                                         env:"PAGERDUTY_AUTH_TOKEN"                         description:"PagerDuty auth token" required:"true"`
 }
 
 func main() {
