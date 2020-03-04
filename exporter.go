@@ -9,6 +9,7 @@ import (
 	elasticsearch "github.com/elastic/go-elasticsearch/v7"
 	esapi "github.com/elastic/go-elasticsearch/v7/esapi"
 	"github.com/prometheus/client_golang/prometheus"
+	"net/http"
 	"time"
 )
 
@@ -76,8 +77,9 @@ func (e *PagerdutyElasticsearchExporter) SetScrapeTime(value time.Duration) {
 	e.scrapeTime = &value
 }
 
-func (e *PagerdutyElasticsearchExporter) ConnectPagerduty(token string) {
+func (e *PagerdutyElasticsearchExporter) ConnectPagerduty(token string, httpClient *http.Client) {
 	e.pagerdutyClient = pagerduty.NewClient(opts.PagerDutyAuthToken)
+	e.pagerdutyClient.HTTPClient = httpClient
 }
 
 func (e *PagerdutyElasticsearchExporter) SetPagerdutyDateRange(value time.Duration) {

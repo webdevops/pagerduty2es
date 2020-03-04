@@ -7,8 +7,10 @@ import (
 	"github.com/jessevdk/go-flags"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"log"
+	"net"
 	"net/http"
 	"os"
+	"runtime"
 	"time"
 )
 
@@ -36,8 +38,9 @@ var opts struct {
 	ScrapeTime time.Duration `long:"scrape-time"  env:"SCRAPE_TIME"   description:"Scrape time (time.duration)" default:"5m"`
 
 	// PagerDuty settings
-	PagerDutyAuthToken string        `long:"pagerduty.authtoken"   env:"PAGERDUTY_AUTH_TOKEN"  description:"PagerDuty auth token" required:"true"`
-	PagerDutySince     time.Duration `long:"pagerduty.date-range"  env:"PAGERDUTY_DATE_RANGE"  description:"PagerDuty date range" default:"168h"`
+	PagerDutyAuthToken      string        `long:"pagerduty.authtoken"        env:"PAGERDUTY_AUTH_TOKEN"  description:"PagerDuty auth token" required:"true"`
+	PagerDutySince          time.Duration `long:"pagerduty.date-range"       env:"PAGERDUTY_DATE_RANGE"  description:"PagerDuty date range" default:"168h"`
+	PagerDutyMaxConnections int           `long:"pagerduty.max-connections"  env:"PAGERDUTY_MAX_CONNECTIONS"                    description:"Maximum numbers of TCP connections to PagerDuty API (concurrency)" default:"4"`
 
 	// ElasticSearch settings
 	ElasticsearchAddresses []string `long:"elasticsearch.address"  env:"ELASTICSEARCH_ADDRESS"  delim:" "  description:"ElasticSearch urls" required:"true"`
@@ -61,7 +64,24 @@ func main() {
 	exporter.Init()
 	exporter.SetScrapeTime(opts.ScrapeTime)
 	exporter.SetPagerdutyDateRange(opts.PagerDutySince)
-	exporter.ConnectPagerduty(opts.PagerDutyAuthToken)
+	exporter.ConnectPagerduty(
+		opts.PagerDutyAuthToken,
+		&http.Client{
+			Transport: &http.Transport{
+				Proxy: http.ProxyFromEnvironment,
+				DialContext: (&net.Dialer{
+					Timeout:   30 * time.Second,
+					KeepAlive: 30 * time.Second,
+				}).DialContext,
+				MaxConnsPerHost:       opts.PagerDutyMaxConnections,
+				MaxIdleConns:          opts.PagerDutyMaxConnections,
+				IdleConnTimeout:       60 * time.Second,
+				TLSHandshakeTimeout:   10 * time.Second,
+				ExpectContinueTimeout: 1 * time.Second,
+				MaxIdleConnsPerHost:   runtime.GOMAXPROCS(0) + 1,
+			},
+		},
+	)
 
 	cfg := elasticsearch.Config{
 		Addresses: opts.ElasticsearchAddresses,

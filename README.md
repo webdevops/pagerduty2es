@@ -16,6 +16,7 @@ Configuration
 | `SERVER_BIND`                           | `:8080`                     | IP/Port binding                                                          |
 | `PAGERDUTY_AUTH_TOKEN`                  | none                        | PagerDuty auth token                                                     |
 | `PAGERDUTY_DATE_RANGE`                  | `168h`                      | Date range for importing historical data                                 |
+| `PAGERDUTY_MAX_CONNECTIONS`             | `4`                         | Maximum numbers of HTTP connections to PagerDuty API                     |
 | `ELASTICSEARCH_ADDRESS`                 | none, required              | ElasticSearch cluster addresses (multiple)                               |
 | `ELASTICSEARCH_INDEX`                   | `pagerduty`                 | Name of ElasticSearch index                                              |
 
