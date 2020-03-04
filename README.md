@@ -27,8 +27,8 @@ Metrics
 
 | Metric                                       | Description                                                        |
 |----------------------------------------------|--------------------------------------------------------------------|
-| `pagerduty2es_incident_counter`              | Total number of processed incidents                                |
-| `pagerduty2es_incident_logentry_counter`     | Total number of processed logentries                               |
+| `pagerduty2es_incident_total`                | Total number of processed incidents                                |
+| `pagerduty2es_incident_logentry_total`       | Total number of processed logentries                               |
 | `pagerduty2es_duration`                      | Scrape process duration                                            |
 | `pagerduty2es_elasticsearch_requet_total`    | Number of total requests to ElasticSearch cluster                  |
 | `pagerduty2es_elasticsearch_request_retries` | Number of retried requests to ElasticSearch cluster                |

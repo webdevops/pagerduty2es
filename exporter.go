@@ -58,7 +58,7 @@ func (e *PagerdutyElasticsearchExporter) Init() {
 
 	e.prometheus.incident = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "pagerduty2es_incident_counter",
+			Name: "pagerduty2es_incident_total",
 			Help: "PagerDuty2es incident counter",
 		},
 		[]string{},
@@ -66,7 +66,7 @@ func (e *PagerdutyElasticsearchExporter) Init() {
 
 	e.prometheus.incidentLogEntry = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "pagerduty2es_incident_logentry_counter",
+			Name: "pagerduty2es_incident_logentry_total",
 			Help: "PagerDuty2es incident logentry counter",
 		},
 		[]string{},
