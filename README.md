@@ -19,12 +19,16 @@ Configuration
 | `PAGERDUTY_MAX_CONNECTIONS`             | `4`                         | Maximum numbers of HTTP connections to PagerDuty API                     |
 | `ELASTICSEARCH_ADDRESS`                 | none, required              | ElasticSearch cluster addresses (multiple)                               |
 | `ELASTICSEARCH_INDEX`                   | `pagerduty`                 | Name of ElasticSearch index                                              |
+| `ELASTICSEARCH_RETRY_COUNT`             | `5`                         | ElasticSearch request retry count                                        |
+| `ELASTICSEARCH_RETRY_DELAY`             | `5s`                        | ElasticSearch request delay for reach retry                              |
 
 Metrics
 -------
 
-| Metric                                   | Description                                                        |
-|------------------------------------------|--------------------------------------------------------------------|
-| `pagerduty2es_incident_counter`          | Total number of processed incidents                                |
-| `pagerduty2es_incident_logentry_counter` | Total number of processed logentries                               |
-| `pagerduty2es_duration`                  | Scrape process duration                                            |
+| Metric                                       | Description                                                        |
+|----------------------------------------------|--------------------------------------------------------------------|
+| `pagerduty2es_incident_counter`              | Total number of processed incidents                                |
+| `pagerduty2es_incident_logentry_counter`     | Total number of processed logentries                               |
+| `pagerduty2es_duration`                      | Scrape process duration                                            |
+| `pagerduty2es_elasticsearch_requet_total`    | Number of total requests to ElasticSearch cluster                  |
+| `pagerduty2es_elasticsearch_request_retries` | Number of retried requests to ElasticSearch cluster                |

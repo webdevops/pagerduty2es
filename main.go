@@ -41,8 +41,10 @@ var opts struct {
 	PagerDutyMaxConnections int           `long:"pagerduty.max-connections"  env:"PAGERDUTY_MAX_CONNECTIONS"                    description:"Maximum numbers of TCP connections to PagerDuty API (concurrency)" default:"4"`
 
 	// ElasticSearch settings
-	ElasticsearchAddresses []string `long:"elasticsearch.address"  env:"ELASTICSEARCH_ADDRESS"  delim:" "  description:"ElasticSearch urls" required:"true"`
-	ElasticsearchIndex     string   `long:"elasticsearch.index"    env:"ELASTICSEARCH_INDEX"               description:"ElasticSearch index name" default:"pagerduty"`
+	ElasticsearchAddresses  []string      `long:"elasticsearch.address"      env:"ELASTICSEARCH_ADDRESS"  delim:" "  description:"ElasticSearch urls" required:"true"`
+	ElasticsearchIndex      string        `long:"elasticsearch.index"        env:"ELASTICSEARCH_INDEX"               description:"ElasticSearch index name" default:"pagerduty"`
+	ElasticsearchRetryCount int           `long:"elasticsearch.retry-count"  env:"ELASTICSEARCH_RETRY_COUNT"         description:"ElasticSearch request retry count" default:"5"`
+	ElasticsearchRetryDelay time.Duration `long:"elasticsearch.retry-delay"  env:"ELASTICSEARCH_RETRY_DELAY"         description:"ElasticSearch request delay for reach retry" default:"5s"`
 }
 
 func main() {
@@ -85,6 +87,7 @@ func main() {
 		Addresses: opts.ElasticsearchAddresses,
 	}
 	exporter.ConnectElasticsearch(cfg, opts.ElasticsearchIndex)
+	exporter.SetElasticsearchRetry(opts.ElasticsearchRetryCount, opts.ElasticsearchRetryDelay)
 	exporter.Run()
 
 	daemonLogger.Infof("Starting http server on %s", opts.ServerBind)

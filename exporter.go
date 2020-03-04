@@ -21,6 +21,8 @@ type (
 		elasticSearchClient    *elasticsearch.Client
 		elasticsearchIndexName string
 		elasticsearchBatchCount int
+		elasticsearchRetryCount int
+		elasticsearchRetryDelay time.Duration
 
 		pagerdutyClient    *pagerduty.Client
 		pagerdutyDateRange *time.Duration
@@ -28,7 +30,9 @@ type (
 		prometheus struct {
 			incident         *prometheus.CounterVec
 			incidentLogEntry *prometheus.CounterVec
-			duration         *prometheus.GaugeVec
+			esRequestTotal *prometheus.CounterVec
+			esRequestRetries  *prometheus.CounterVec
+			duration          *prometheus.GaugeVec
 		}
 	}
 
@@ -49,6 +53,8 @@ type (
 
 func (e *PagerdutyElasticsearchExporter) Init() {
 	e.elasticsearchBatchCount = 10
+	e.elasticsearchRetryCount = 5
+	e.elasticsearchRetryDelay = 5 * time.Second
 
 	e.prometheus.incident = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
@@ -66,6 +72,21 @@ func (e *PagerdutyElasticsearchExporter) Init() {
 		[]string{},
 	)
 
+	e.prometheus.esRequestTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "pagerduty2es_elasticsearch_requet_total",
+			Help: "PagerDuty2es elasticsearch request total counter",
+		},
+		[]string{},
+	)
+	e.prometheus.esRequestRetries = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "pagerduty2es_elasticsearch_request_retries",
+			Help: "PagerDuty2es elasticsearch request retries counter",
+		},
+		[]string{},
+	)
+
 	e.prometheus.duration = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "pagerduty2es_duration",
@@ -76,6 +97,8 @@ func (e *PagerdutyElasticsearchExporter) Init() {
 
 	prometheus.MustRegister(e.prometheus.incident)
 	prometheus.MustRegister(e.prometheus.incidentLogEntry)
+	prometheus.MustRegister(e.prometheus.esRequestTotal)
+	prometheus.MustRegister(e.prometheus.esRequestRetries)
 	prometheus.MustRegister(e.prometheus.duration)
 }
 
@@ -105,6 +128,11 @@ func (e *PagerdutyElasticsearchExporter) ConnectElasticsearch(cfg elasticsearch.
 	}
 
 	e.elasticsearchIndexName = indexName
+}
+
+func (e *PagerdutyElasticsearchExporter) SetElasticsearchRetry(retryCount int, retryDelay time.Duration) {
+	e.elasticsearchRetryCount = retryCount
+	e.elasticsearchRetryDelay = retryDelay
 }
 
 func (e *PagerdutyElasticsearchExporter) Run() {
@@ -218,9 +246,28 @@ func (e *PagerdutyElasticsearchExporter) indexIncidentLogEntry(incident pagerdut
 }
 
 func (e *PagerdutyElasticsearchExporter) doESIndexRequest(req *esapi.IndexRequest) {
-	res, err := req.Do(context.Background(), e.elasticSearchClient)
-	if err != nil {
-		fmt.Println(err)
+	var err error
+	var res *esapi.Response
+
+	for i := 0; i < e.elasticsearchRetryCount; i++ {
+		e.prometheus.esRequestTotal.WithLabelValues().Inc()
+
+		res, err = req.Do(context.Background(), e.elasticSearchClient)
+		if err == nil {
+			res.Body.Close()
+
+			// success
+			return
+		}
+
+		// got an error
+		daemonLogger.Errorf("Retrying ES index error: %v", err)
+		e.prometheus.esRequestRetries.WithLabelValues().Inc()
+
+		// wait until retry
+		time.Sleep(e.elasticsearchRetryDelay)
 	}
-	defer res.Body.Close()
+
+	// must be an error
+	panic("Fatal ES index error: " + err.Error())
 }
