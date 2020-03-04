@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/PagerDuty/go-pagerduty"
@@ -18,8 +17,8 @@ type (
 	PagerdutyElasticsearchExporter struct {
 		scrapeTime *time.Duration
 
-		elasticSearchClient    *elasticsearch.Client
-		elasticsearchIndexName string
+		elasticSearchClient     *elasticsearch.Client
+		elasticsearchIndexName  string
 		elasticsearchBatchCount int
 		elasticsearchRetryCount int
 		elasticsearchRetryDelay time.Duration
@@ -30,21 +29,21 @@ type (
 		prometheus struct {
 			incident         *prometheus.CounterVec
 			incidentLogEntry *prometheus.CounterVec
-			esRequestTotal *prometheus.CounterVec
-			esRequestRetries  *prometheus.CounterVec
-			duration          *prometheus.GaugeVec
+			esRequestTotal   *prometheus.CounterVec
+			esRequestRetries *prometheus.CounterVec
+			duration         *prometheus.GaugeVec
 		}
 	}
 
 	ElasticsearchIncident struct {
-		DocumentID  string `json:"_id,omitempty"`
+		DocumentID string `json:"_id,omitempty"`
 		Timestamp  string `json:"@timestamp,omitempty"`
 		IncidentId string `json:"@incident,omitempty"`
 		*pagerduty.Incident
 	}
 
 	ElasticsearchIncidentLog struct {
-		DocumentID  string `json:"_id,omitempty"`
+		DocumentID string `json:"_id,omitempty"`
 		Timestamp  string `json:"@timestamp,omitempty"`
 		IncidentId string `json:"@incident,omitempty"`
 		*pagerduty.LogEntry
@@ -130,6 +129,10 @@ func (e *PagerdutyElasticsearchExporter) ConnectElasticsearch(cfg elasticsearch.
 	e.elasticsearchIndexName = indexName
 }
 
+func (e *PagerdutyElasticsearchExporter) SetElasticsearchBatchCount(batchCount int) {
+	e.elasticsearchBatchCount = batchCount
+}
+
 func (e *PagerdutyElasticsearchExporter) SetElasticsearchRetry(retryCount int, retryDelay time.Duration) {
 	e.elasticsearchRetryCount = retryCount
 	e.elasticsearchRetryDelay = retryDelay
@@ -168,8 +171,19 @@ func (e *PagerdutyElasticsearchExporter) runScrape() {
 	wgProcess.Add(1)
 	go func() {
 		defer wgProcess.Done()
+
+		bulkIndexRequests := []*esapi.IndexRequest{}
 		for esIndexRequest := range esIndexRequestChannel {
-			e.doESIndexRequest(esIndexRequest)
+			bulkIndexRequests = append(bulkIndexRequests, esIndexRequest)
+
+			if len(bulkIndexRequests) >= e.elasticsearchBatchCount {
+				e.doESIndexRequestBulk(bulkIndexRequests)
+				bulkIndexRequests = []*esapi.IndexRequest{}
+			}
+		}
+
+		if len(bulkIndexRequests) >= 1 {
+			e.doESIndexRequestBulk(bulkIndexRequests)
 		}
 	}()
 
@@ -245,16 +259,53 @@ func (e *PagerdutyElasticsearchExporter) indexIncidentLogEntry(incident pagerdut
 	callback <- &req
 }
 
-func (e *PagerdutyElasticsearchExporter) doESIndexRequest(req *esapi.IndexRequest) {
+type (
+	BulkMetaIndex struct {
+		Index BulkMetaIndexIndex `json:"index,omitempty"`
+	}
+
+	BulkMetaIndexIndex struct {
+		Id    string `json:"_id,omitempty"`
+		Type  string `json:"_type,omitempty"`
+		Index string `json:"_index,omitempty"`
+	}
+)
+
+func (e *PagerdutyElasticsearchExporter) doESIndexRequestBulk(bulkRequests []*esapi.IndexRequest) {
+	var buf bytes.Buffer
+	newline := []byte("\n")
+
 	var err error
-	var res *esapi.Response
+	var resp *esapi.Response
 
 	for i := 0; i < e.elasticsearchRetryCount; i++ {
-		e.prometheus.esRequestTotal.WithLabelValues().Inc()
+		for _, indexRequest := range bulkRequests {
+			// generate bulk index action line
+			meta := BulkMetaIndex{
+				Index: BulkMetaIndexIndex{
+					Id:    indexRequest.DocumentID,
+					Type:  indexRequest.DocumentType,
+					Index: indexRequest.Index,
+				},
+			}
+			metaJson, _ := json.Marshal(meta)
 
-		res, err = req.Do(context.Background(), e.elasticSearchClient)
-		if err == nil {
-			res.Body.Close()
+			// generate document line
+			document := new(bytes.Buffer)
+			document.ReadFrom(indexRequest.Body)
+
+			// generate index line
+			buf.Grow(len(metaJson) + len(newline) + document.Len() + len(newline))
+			buf.Write(metaJson)
+			buf.Write(newline)
+			buf.Write(document.Bytes())
+			buf.Write(newline)
+		}
+
+		e.prometheus.esRequestTotal.WithLabelValues().Inc()
+		resp, err = e.elasticSearchClient.Bulk(bytes.NewReader(buf.Bytes()))
+		if err == nil && resp.StatusCode == http.StatusOK {
+			resp.Body.Close()
 
 			// success
 			return
