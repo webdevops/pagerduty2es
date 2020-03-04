@@ -111,12 +111,12 @@ func (e *PagerdutyElasticsearchExporter) Run() {
 }
 
 func (e *PagerdutyElasticsearchExporter) sleepUntilNextCollection() {
-	Logger.Verbosef("sleeping %v", e.scrapeTime)
+	daemonLogger.Verbosef("sleeping %v", e.scrapeTime)
 	time.Sleep(*e.scrapeTime)
 }
 
 func (e *PagerdutyElasticsearchExporter) runScrape() {
-	Logger.Verbosef("Starting scraping")
+	daemonLogger.Verbosef("Starting scraping")
 
 	since := time.Now().Add(-*e.pagerdutyDateRange).Format(time.RFC3339)
 	listOpts := pagerduty.ListIncidentsOptions{
@@ -133,7 +133,7 @@ func (e *PagerdutyElasticsearchExporter) runScrape() {
 		}
 
 		for _, incident := range incidentResponse.Incidents {
-			Logger.Verbosef(" - Incident %v", incident.Id)
+			daemonLogger.Verbosef(" - Incident %v", incident.Id)
 			e.indexIncident(incident)
 
 			listLogOpts := pagerduty.ListIncidentLogEntriesOptions{}
@@ -143,7 +143,7 @@ func (e *PagerdutyElasticsearchExporter) runScrape() {
 			}
 
 			for _, logEntry := range incidentLogResponse.LogEntries {
-				Logger.Verbosef("   - LogEntry %v", logEntry.ID)
+				daemonLogger.Verbosef("   - LogEntry %v", logEntry.ID)
 				e.indexIncidentLogEntry(incident, logEntry)
 			}
 		}
@@ -156,7 +156,7 @@ func (e *PagerdutyElasticsearchExporter) runScrape() {
 
 	duration := time.Now().Sub(startTime)
 	e.prometheus.duration.WithLabelValues().Set(duration.Seconds())
-	Logger.Verbosef("processing took %v", duration.String())
+	daemonLogger.Verbosef("processing took %v", duration.String())
 }
 
 func (e *PagerdutyElasticsearchExporter) indexIncident(incident pagerduty.Incident) {

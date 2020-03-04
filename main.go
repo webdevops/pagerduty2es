@@ -22,14 +22,14 @@ const (
 )
 
 var (
-	argparser       *flags.Parser
-	Verbose         bool
-	Logger          *DaemonLogger
+	argparser    *flags.Parser
+	verbose      bool
+	daemonLogger *DaemonLogger
 )
 
 var opts struct {
 	// general settings
-	Verbose []bool `long:"verbose" short:"v"  env:"VERBOSE"  description:"Verbose mode"`
+	Verbose []bool `long:"verbose" short:"v"  env:"VERBOSE"  description:"verbose mode"`
 
 	// server settings
 	ServerBind string        `long:"bind"         env:"SERVER_BIND"   description:"Server address" default:":8080"`
@@ -49,15 +49,15 @@ func main() {
 	initArgparser()
 
 	// set verbosity
-	Verbose = len(opts.Verbose) >= 1
+	verbose = len(opts.Verbose) >= 1
 
 	// Init logger
-	Logger = NewLogger(log.Lshortfile, Verbose)
-	defer Logger.Close()
+	daemonLogger = NewLogger(log.Lshortfile, verbose)
+	defer daemonLogger.Close()
 
-	Logger.Infof("Init Pagerduty2ElasticSearch exporter v%s (written by %v)", version, author)
+	daemonLogger.Infof("Init Pagerduty2ElasticSearch exporter v%s (written by %v)", version, author)
 
-	Logger.Infof("Init exporter")
+	daemonLogger.Infof("Init exporter")
 	exporter := PagerdutyElasticsearchExporter{}
 	exporter.Init()
 	exporter.SetScrapeTime(opts.ScrapeTime)
@@ -87,7 +87,7 @@ func main() {
 	exporter.ConnectElasticsearch(cfg, opts.ElasticsearchIndex)
 	exporter.Run()
 
-	Logger.Infof("Starting http server on %s", opts.ServerBind)
+	daemonLogger.Infof("Starting http server on %s", opts.ServerBind)
 	startHttpServer()
 }
 
@@ -111,5 +111,5 @@ func initArgparser() {
 // start and handle prometheus handler
 func startHttpServer() {
 	http.Handle("/metrics", promhttp.Handler())
-	Logger.Fatal(http.ListenAndServe(opts.ServerBind, nil))
+	daemonLogger.Fatal(http.ListenAndServe(opts.ServerBind, nil))
 }
