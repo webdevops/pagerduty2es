@@ -1,4 +1,4 @@
-module github.com/webdevops/pagerduty-elasticsearch-exporter
+module github.com/webdevops/pagerduty2elasticsearch-exporter
 
 go 1.14
 
