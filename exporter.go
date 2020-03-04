@@ -292,7 +292,10 @@ func (e *PagerdutyElasticsearchExporter) doESIndexRequestBulk(bulkRequests []*es
 
 			// generate document line
 			document := new(bytes.Buffer)
-			document.ReadFrom(indexRequest.Body)
+			_, readErr := document.ReadFrom(indexRequest.Body)
+			if readErr != nil {
+				panic(readErr)
+			}
 
 			// generate index line
 			buf.Grow(len(metaJson) + len(newline) + document.Len() + len(newline))
