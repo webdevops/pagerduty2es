@@ -122,7 +122,7 @@ func (e *PagerdutyElasticsearchExporter) runScrape() {
 	listOpts := pagerduty.ListIncidentsOptions{
 		Since: since,
 	}
-	listOpts.Limit = PAGERDUTY_INCIDENT_LIMIT
+	listOpts.Limit = PagerdutyIncidentLimit
 	listOpts.Offset = 0
 
 	startTime := time.Now()

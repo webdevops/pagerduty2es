@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/PagerDuty/go-pagerduty"
 	elasticsearch "github.com/elastic/go-elasticsearch/v7"
 	"github.com/jessevdk/go-flags"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -15,18 +14,17 @@ import (
 )
 
 const (
-	Author  = "webdevops.io"
-	Version = "0.1.0"
+	author  = "webdevops.io"
+	version = "0.1.0"
 
-	PAGERDUTY_INCIDENT_LIMIT = 100
+	// Limit of pagerduty incidents per call
+	PagerdutyIncidentLimit = 100
 )
 
 var (
 	argparser       *flags.Parser
-	args            []string
 	Verbose         bool
 	Logger          *DaemonLogger
-	PagerDutyClient *pagerduty.Client
 )
 
 var opts struct {
@@ -57,7 +55,7 @@ func main() {
 	Logger = NewLogger(log.Lshortfile, Verbose)
 	defer Logger.Close()
 
-	Logger.Infof("Init Pagerduty2ElasticSearch exporter v%s (written by %v)", Version, Author)
+	Logger.Infof("Init Pagerduty2ElasticSearch exporter v%s (written by %v)", version, author)
 
 	Logger.Infof("Init exporter")
 	exporter := PagerdutyElasticsearchExporter{}
