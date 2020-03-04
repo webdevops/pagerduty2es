@@ -10,6 +10,7 @@ import (
 	esapi "github.com/elastic/go-elasticsearch/v7/esapi"
 	"github.com/prometheus/client_golang/prometheus"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -19,6 +20,7 @@ type (
 
 		elasticSearchClient    *elasticsearch.Client
 		elasticsearchIndexName string
+		elasticsearchBatchCount int
 
 		pagerdutyClient    *pagerduty.Client
 		pagerdutyDateRange *time.Duration
@@ -31,12 +33,14 @@ type (
 	}
 
 	ElasticsearchIncident struct {
+		DocumentID  string `json:"_id,omitempty"`
 		Timestamp  string `json:"@timestamp,omitempty"`
 		IncidentId string `json:"@incident,omitempty"`
 		*pagerduty.Incident
 	}
 
 	ElasticsearchIncidentLog struct {
+		DocumentID  string `json:"_id,omitempty"`
 		Timestamp  string `json:"@timestamp,omitempty"`
 		IncidentId string `json:"@incident,omitempty"`
 		*pagerduty.LogEntry
@@ -44,6 +48,8 @@ type (
 )
 
 func (e *PagerdutyElasticsearchExporter) Init() {
+	e.elasticsearchBatchCount = 10
+
 	e.prometheus.incident = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "pagerduty2es_incident_counter",
@@ -116,6 +122,7 @@ func (e *PagerdutyElasticsearchExporter) sleepUntilNextCollection() {
 }
 
 func (e *PagerdutyElasticsearchExporter) runScrape() {
+	var wgProcess sync.WaitGroup
 	daemonLogger.Verbosef("Starting scraping")
 
 	since := time.Now().Add(-*e.pagerdutyDateRange).Format(time.RFC3339)
@@ -125,7 +132,19 @@ func (e *PagerdutyElasticsearchExporter) runScrape() {
 	listOpts.Limit = PagerdutyIncidentLimit
 	listOpts.Offset = 0
 
+	esIndexRequestChannel := make(chan *esapi.IndexRequest, e.elasticsearchBatchCount)
+
 	startTime := time.Now()
+
+	// index from channel
+	wgProcess.Add(1)
+	go func() {
+		defer wgProcess.Done()
+		for esIndexRequest := range esIndexRequestChannel {
+			e.doESIndexRequest(esIndexRequest)
+		}
+	}()
+
 	for {
 		incidentResponse, err := e.pagerdutyClient.ListIncidents(listOpts)
 		if err != nil {
@@ -134,7 +153,7 @@ func (e *PagerdutyElasticsearchExporter) runScrape() {
 
 		for _, incident := range incidentResponse.Incidents {
 			daemonLogger.Verbosef(" - Incident %v", incident.Id)
-			e.indexIncident(incident)
+			e.indexIncident(incident, esIndexRequestChannel)
 
 			listLogOpts := pagerduty.ListIncidentLogEntriesOptions{}
 			incidentLogResponse, err := e.pagerdutyClient.ListIncidentLogEntries(incident.Id, listLogOpts)
@@ -144,7 +163,7 @@ func (e *PagerdutyElasticsearchExporter) runScrape() {
 
 			for _, logEntry := range incidentLogResponse.LogEntries {
 				daemonLogger.Verbosef("   - LogEntry %v", logEntry.ID)
-				e.indexIncidentLogEntry(incident, logEntry)
+				e.indexIncidentLogEntry(incident, logEntry, esIndexRequestChannel)
 			}
 		}
 
@@ -153,13 +172,16 @@ func (e *PagerdutyElasticsearchExporter) runScrape() {
 		}
 		listOpts.Offset += listOpts.Limit
 	}
+	close(esIndexRequestChannel)
+
+	wgProcess.Wait()
 
 	duration := time.Now().Sub(startTime)
 	e.prometheus.duration.WithLabelValues().Set(duration.Seconds())
 	daemonLogger.Verbosef("processing took %v", duration.String())
 }
 
-func (e *PagerdutyElasticsearchExporter) indexIncident(incident pagerduty.Incident) {
+func (e *PagerdutyElasticsearchExporter) indexIncident(incident pagerduty.Incident, callback chan<- *esapi.IndexRequest) {
 	e.prometheus.incident.WithLabelValues().Inc()
 
 	esIncident := ElasticsearchIncident{
@@ -173,17 +195,11 @@ func (e *PagerdutyElasticsearchExporter) indexIncident(incident pagerduty.Incide
 		Index:      opts.ElasticsearchIndex,
 		DocumentID: fmt.Sprintf("incident-%v", incident.Id),
 		Body:       bytes.NewReader(incidentJson),
-		Refresh:    "true",
 	}
-
-	res, err := req.Do(context.Background(), e.elasticSearchClient)
-	if err != nil {
-		fmt.Println(err)
-	}
-	defer res.Body.Close()
+	callback <- &req
 }
 
-func (e *PagerdutyElasticsearchExporter) indexIncidentLogEntry(incident pagerduty.Incident, logEntry pagerduty.LogEntry) {
+func (e *PagerdutyElasticsearchExporter) indexIncidentLogEntry(incident pagerduty.Incident, logEntry pagerduty.LogEntry, callback chan<- *esapi.IndexRequest) {
 	e.prometheus.incidentLogEntry.WithLabelValues().Inc()
 
 	esLogEntry := ElasticsearchIncidentLog{
@@ -197,9 +213,11 @@ func (e *PagerdutyElasticsearchExporter) indexIncidentLogEntry(incident pagerdut
 		Index:      opts.ElasticsearchIndex,
 		DocumentID: fmt.Sprintf("logentry-%v", logEntry.ID),
 		Body:       bytes.NewReader(logEntryJson),
-		Refresh:    "true",
 	}
+	callback <- &req
+}
 
+func (e *PagerdutyElasticsearchExporter) doESIndexRequest(req *esapi.IndexRequest) {
 	res, err := req.Do(context.Background(), e.elasticSearchClient)
 	if err != nil {
 		fmt.Println(err)
