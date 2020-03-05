@@ -86,6 +86,9 @@ func main() {
 
 	cfg := elasticsearch.Config{
 		Addresses: opts.ElasticsearchAddresses,
+		Transport: &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+		},
 	}
 	exporter.ConnectElasticsearch(cfg, opts.ElasticsearchIndex)
 	exporter.SetElasticsearchBatchCount(opts.ElasticsearchBatchCount)
