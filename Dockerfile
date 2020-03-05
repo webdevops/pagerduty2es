@@ -9,7 +9,7 @@ RUN go mod download
 
 # Compile
 COPY ./ /go/src/github.com/webdevops/pagerduty2elasticsearch-exporter
-RUN make lint
+#RUN make lint
 RUN make build
 RUN ./pagerduty2elasticsearch-exporter --help
 
