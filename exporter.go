@@ -9,6 +9,7 @@ import (
 	esapi "github.com/elastic/go-elasticsearch/v7/esapi"
 	"github.com/prometheus/client_golang/prometheus"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
@@ -226,33 +227,53 @@ func (e *PagerdutyElasticsearchExporter) runScrape() {
 func (e *PagerdutyElasticsearchExporter) indexIncident(incident pagerduty.Incident, callback chan<- *esapi.IndexRequest) {
 	e.prometheus.incident.WithLabelValues().Inc()
 
+	createTime, err := time.Parse(time.RFC3339, incident.CreatedAt)
+	if err != nil {
+		panic(err)
+	}
+
 	esIncident := ElasticsearchIncident{
-		Timestamp:  incident.CreatedAt,
+		Timestamp:  createTime.Format(time.RFC3339),
 		IncidentId: incident.Id,
 		Incident:   &incident,
 	}
 	incidentJson, _ := json.Marshal(esIncident)
 
 	req := esapi.IndexRequest{
-		Index:      opts.ElasticsearchIndex,
+		Index:      e.buildIndexName(createTime),
 		DocumentID: fmt.Sprintf("incident-%v", incident.Id),
 		Body:       bytes.NewReader(incidentJson),
 	}
 	callback <- &req
 }
 
+func (e *PagerdutyElasticsearchExporter) buildIndexName(createTime time.Time) string {
+	ret := e.elasticsearchIndexName
+
+	ret = strings.Replace(ret, "%y", createTime.Format("2006"), -1)
+	ret = strings.Replace(ret, "%m", createTime.Format("01"), -1)
+	ret = strings.Replace(ret, "%d", createTime.Format("02"), -1)
+
+	return ret
+}
+
 func (e *PagerdutyElasticsearchExporter) indexIncidentLogEntry(incident pagerduty.Incident, logEntry pagerduty.LogEntry, callback chan<- *esapi.IndexRequest) {
 	e.prometheus.incidentLogEntry.WithLabelValues().Inc()
 
+	createTime, err := time.Parse(time.RFC3339, logEntry.CreatedAt)
+	if err != nil {
+		panic(err)
+	}
+
 	esLogEntry := ElasticsearchIncidentLog{
-		Timestamp:  logEntry.CreatedAt,
+		Timestamp:  createTime.Format(time.RFC3339),
 		IncidentId: incident.Id,
 		LogEntry:   &logEntry,
 	}
 	logEntryJson, _ := json.Marshal(esLogEntry)
 
 	req := esapi.IndexRequest{
-		Index:      opts.ElasticsearchIndex,
+		Index:      e.buildIndexName(createTime),
 		DocumentID: fmt.Sprintf("logentry-%v", logEntry.ID),
 		Body:       bytes.NewReader(logEntryJson),
 	}

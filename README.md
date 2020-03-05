@@ -18,7 +18,7 @@ Configuration
 | `PAGERDUTY_DATE_RANGE`                  | `168h`                      | Date range for importing historical data                                 |
 | `PAGERDUTY_MAX_CONNECTIONS`             | `4`                         | Maximum numbers of HTTP connections to PagerDuty API                     |
 | `ELASTICSEARCH_ADDRESS`                 | none, required              | ElasticSearch cluster addresses (multiple)                               |
-| `ELASTICSEARCH_INDEX`                   | `pagerduty`                 | Name of ElasticSearch index                                              |
+| `ELASTICSEARCH_INDEX`                   | `pagerduty`                 | Name of ElasticSearch index  (placeholders: %y for year, %m for month and %d for day) |
 | `ELASTICSEARCH_BATCH_COUNT`             | `50`                        | Number of documents which should be indexed in one request                |
 | `ELASTICSEARCH_RETRY_COUNT`             | `5`                         | ElasticSearch request retry count                                        |
 | `ELASTICSEARCH_RETRY_DELAY`             | `5s`                        | ElasticSearch request delay for reach retry                              |
