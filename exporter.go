@@ -122,9 +122,21 @@ func (e *PagerdutyElasticsearchExporter) ConnectElasticsearch(cfg elasticsearch.
 		panic(err)
 	}
 
-	_, err = e.elasticSearchClient.Info()
-	if err != nil {
-		panic(err)
+	tries := 0
+	for {
+		_, err = e.elasticSearchClient.Info()
+		if err != nil {
+			tries++
+			if tries >= 5 {
+				panic(err)
+ 			} else {
+ 				daemonLogger.Info("Failed to connect to ES, retry...")
+ 				time.Sleep(5 * time.Second)
+ 				continue
+			}
+		}
+
+		break
 	}
 
 	e.elasticsearchIndexName = indexName
@@ -335,6 +347,10 @@ func (e *PagerdutyElasticsearchExporter) doESIndexRequestBulk(bulkRequests []*es
 			return
 		}
 
+		if resp != nil {
+			daemonLogger.Errorf("Unexpected HTTP %v response: %v", resp.StatusCode, resp.String())
+		}
+
 		// got an error
 		daemonLogger.Errorf("Retrying ES index error: %v", err)
 		e.prometheus.esRequestRetries.WithLabelValues().Inc()
@@ -344,5 +360,9 @@ func (e *PagerdutyElasticsearchExporter) doESIndexRequestBulk(bulkRequests []*es
 	}
 
 	// must be an error
-	panic("Fatal ES index error: " + err.Error())
+	if err != nil {
+		panic("Fatal ES index error: " + err.Error())
+	} else {
+		panic("Unable to process ES request")
+	}
 }
