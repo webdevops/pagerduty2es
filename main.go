@@ -93,10 +93,19 @@ func main() {
 	exporter.ConnectElasticsearch(cfg, opts.ElasticsearchIndex)
 	exporter.SetElasticsearchBatchCount(opts.ElasticsearchBatchCount)
 	exporter.SetElasticsearchRetry(opts.ElasticsearchRetryCount, opts.ElasticsearchRetryDelay)
-	exporter.Run()
 
-	daemonLogger.Infof("Starting http server on %s", opts.ServerBind)
-	startHttpServer()
+	if opts.ScrapeTime.Seconds() > 0 {
+		daemonLogger.Infof("Starting daemon run")
+		exporter.RunDaemon()
+
+		// daemon mode
+		daemonLogger.Infof("Starting http server on %s", opts.ServerBind)
+		startHttpServer()
+	} else {
+		daemonLogger.Infof("Starting single run")
+		exporter.RunSingle()
+		daemonLogger.Infof("completed single run")
+	}
 }
 
 // init argparser and parse/validate arguments

@@ -151,7 +151,12 @@ func (e *PagerdutyElasticsearchExporter) SetElasticsearchRetry(retryCount int, r
 	e.elasticsearchRetryDelay = retryDelay
 }
 
-func (e *PagerdutyElasticsearchExporter) Run() {
+
+func (e *PagerdutyElasticsearchExporter) RunSingle() {
+	e.runScrape()
+}
+
+func (e *PagerdutyElasticsearchExporter) RunDaemon() {
 	go func() {
 		for {
 			e.runScrape()
