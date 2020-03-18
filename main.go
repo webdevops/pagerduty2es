@@ -15,7 +15,7 @@ import (
 
 const (
 	author  = "webdevops.io"
-	version = "0.5.1"
+	version = "0.5.2"
 
 	// Limit of pagerduty incidents per call
 	PagerdutyIncidentLimit = 100
