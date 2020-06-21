@@ -1,3 +1,3 @@
-/Dockerfile
 /vendor/
 /pagerduty-elasticsearch-exporter
+*.exe

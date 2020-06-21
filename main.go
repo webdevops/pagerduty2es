@@ -15,7 +15,6 @@ import (
 
 const (
 	author  = "webdevops.io"
-	version = "0.5.2"
 
 	// Limit of pagerduty incidents per call
 	PagerdutyIncidentLimit = 100
@@ -25,6 +24,10 @@ var (
 	argparser    *flags.Parser
 	verbose      bool
 	daemonLogger *DaemonLogger
+
+	// Git version information
+	gitCommit = "<unknown>"
+	gitTag    = "<unknown>"
 )
 
 var opts struct {
@@ -58,7 +61,7 @@ func main() {
 	daemonLogger = NewLogger(log.Lshortfile, verbose)
 	defer daemonLogger.Close()
 
-	daemonLogger.Infof("Init Pagerduty2ElasticSearch exporter v%s (written by %v)", version, author)
+	daemonLogger.Infof("Init Pagerduty2ElasticSearch exporter v%s (%s; by %v)", gitTag, gitCommit, author)
 
 	daemonLogger.Infof("Init exporter")
 	exporter := PagerdutyElasticsearchExporter{}
