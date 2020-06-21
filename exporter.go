@@ -212,6 +212,11 @@ func (e *PagerdutyElasticsearchExporter) runScrape() {
 		}
 
 		for _, incident := range incidentResponse.Incidents {
+			// workaround for https://github.com/PagerDuty/go-pagerduty/issues/218
+			if incident.Id == "" {
+				incident.Id = incident.ID
+			}
+
 			daemonLogger.Verbosef(" - Incident %v", incident.Id)
 			e.indexIncident(incident, esIndexRequestChannel)
 
