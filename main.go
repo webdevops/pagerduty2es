@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	author  = "webdevops.io"
+	author = "webdevops.io"
 
 	// Limit of pagerduty incidents per call
 	PagerdutyIncidentLimit = 100
@@ -45,6 +45,9 @@ var opts struct {
 
 	// ElasticSearch settings
 	ElasticsearchAddresses  []string      `long:"elasticsearch.address"      env:"ELASTICSEARCH_ADDRESS"  delim:" "  description:"ElasticSearch urls" required:"true"`
+	ElasticsearchUsername   string        `long:"elasticsearch.username"     env:"ELASTICSEARCH_USERNAME"            description:"ElasticSearch username for HTTP Basic Authentication"`
+	ElasticsearchPassword   string        `long:"elasticsearch.password"     env:"ELASTICSEARCH_PASSWORD"            description:"ElasticSearch password for HTTP Basic Authenticatio"`
+	ElasticsearchApiKey     string        `long:"elasticsearch.apikey"       env:"ELASTICSEARCH_APIKEY"              description:"ElasticSearch base64-encoded token for authorization; if set, overrides username and password"`
 	ElasticsearchIndex      string        `long:"elasticsearch.index"        env:"ELASTICSEARCH_INDEX"               description:"ElasticSearch index name (placeholders: %y for year, %m for month and %d for day)" default:"pagerduty"`
 	ElasticsearchBatchCount int           `long:"elasticsearch.batch-count"  env:"ELASTICSEARCH_BATCH_COUNT"         description:"Number of documents which should be indexed in one request"  default:"50"`
 	ElasticsearchRetryCount int           `long:"elasticsearch.retry-count"  env:"ELASTICSEARCH_RETRY_COUNT"         description:"ElasticSearch request retry count"                           default:"5"`
@@ -89,6 +92,9 @@ func main() {
 
 	cfg := elasticsearch.Config{
 		Addresses: opts.ElasticsearchAddresses,
+		Username:  opts.ElasticsearchUsername,
+		Password:  opts.ElasticsearchPassword,
+		APIKey:    opts.ElasticsearchApiKey,
 		Transport: &http.Transport{
 			Proxy: http.ProxyFromEnvironment,
 		},

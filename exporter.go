@@ -129,10 +129,10 @@ func (e *PagerdutyElasticsearchExporter) ConnectElasticsearch(cfg elasticsearch.
 			tries++
 			if tries >= 5 {
 				panic(err)
- 			} else {
- 				daemonLogger.Info("Failed to connect to ES, retry...")
- 				time.Sleep(5 * time.Second)
- 				continue
+			} else {
+				daemonLogger.Info("Failed to connect to ES, retry...")
+				time.Sleep(5 * time.Second)
+				continue
 			}
 		}
 
@@ -150,7 +150,6 @@ func (e *PagerdutyElasticsearchExporter) SetElasticsearchRetry(retryCount int, r
 	e.elasticsearchRetryCount = retryCount
 	e.elasticsearchRetryDelay = retryDelay
 }
-
 
 func (e *PagerdutyElasticsearchExporter) RunSingle() {
 	e.runScrape()
