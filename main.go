@@ -5,11 +5,14 @@ import (
 	elasticsearch "github.com/elastic/go-elasticsearch/v7"
 	"github.com/jessevdk/go-flags"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"log"
+	log "github.com/sirupsen/logrus"
+	"github.com/webdevops/pagerduty2es/config"
 	"net"
 	"net/http"
 	"os"
+	"path"
 	"runtime"
+	"strings"
 	"time"
 )
 
@@ -21,58 +24,27 @@ const (
 )
 
 var (
-	argparser    *flags.Parser
-	verbose      bool
-	daemonLogger *DaemonLogger
+	argparser *flags.Parser
+	opts      config.Opts
 
 	// Git version information
 	gitCommit = "<unknown>"
 	gitTag    = "<unknown>"
 )
 
-var opts struct {
-	// general settings
-	Verbose []bool `long:"verbose" short:"v"  env:"VERBOSE"  description:"verbose mode"`
-
-	// server settings
-	ServerBind string        `long:"bind"         env:"SERVER_BIND"   description:"Server address" default:":8080"`
-	ScrapeTime time.Duration `long:"scrape-time"  env:"SCRAPE_TIME"   description:"Scrape time (time.duration)" default:"5m"`
-
-	// PagerDuty settings
-	PagerDutyAuthToken      string        `long:"pagerduty.authtoken"        env:"PAGERDUTY_AUTH_TOKEN"        description:"PagerDuty auth token" required:"true"`
-	PagerDutySince          time.Duration `long:"pagerduty.date-range"       env:"PAGERDUTY_DATE_RANGE"        description:"PagerDuty date range" default:"168h"`
-	PagerDutyMaxConnections int           `long:"pagerduty.max-connections"  env:"PAGERDUTY_MAX_CONNECTIONS"   description:"Maximum numbers of TCP connections to PagerDuty API (concurrency)" default:"4"`
-
-	// ElasticSearch settings
-	ElasticsearchAddresses  []string      `long:"elasticsearch.address"      env:"ELASTICSEARCH_ADDRESS"  delim:" "  description:"ElasticSearch urls" required:"true"`
-	ElasticsearchUsername   string        `long:"elasticsearch.username"     env:"ELASTICSEARCH_USERNAME"            description:"ElasticSearch username for HTTP Basic Authentication"`
-	ElasticsearchPassword   string        `long:"elasticsearch.password"     env:"ELASTICSEARCH_PASSWORD"            description:"ElasticSearch password for HTTP Basic Authenticatio"`
-	ElasticsearchApiKey     string        `long:"elasticsearch.apikey"       env:"ELASTICSEARCH_APIKEY"              description:"ElasticSearch base64-encoded token for authorization; if set, overrides username and password"`
-	ElasticsearchIndex      string        `long:"elasticsearch.index"        env:"ELASTICSEARCH_INDEX"               description:"ElasticSearch index name (placeholders: %y for year, %m for month and %d for day)" default:"pagerduty"`
-	ElasticsearchBatchCount int           `long:"elasticsearch.batch-count"  env:"ELASTICSEARCH_BATCH_COUNT"         description:"Number of documents which should be indexed in one request"  default:"50"`
-	ElasticsearchRetryCount int           `long:"elasticsearch.retry-count"  env:"ELASTICSEARCH_RETRY_COUNT"         description:"ElasticSearch request retry count"                           default:"5"`
-	ElasticsearchRetryDelay time.Duration `long:"elasticsearch.retry-delay"  env:"ELASTICSEARCH_RETRY_DELAY"         description:"ElasticSearch request delay for reach retry"                 default:"5s"`
-}
-
 func main() {
 	initArgparser()
 
-	// set verbosity
-	verbose = len(opts.Verbose) >= 1
+	log.Infof("starting pagerduty2es v%s (%s; %s; by %v)", gitTag, gitCommit, runtime.Version(), author)
+	log.Info(string(opts.GetJson()))
 
-	// Init logger
-	daemonLogger = NewLogger(log.Lshortfile, verbose)
-	defer daemonLogger.Close()
-
-	daemonLogger.Infof("Init Pagerduty2ElasticSearch exporter v%s (%s; by %v)", gitTag, gitCommit, author)
-
-	daemonLogger.Infof("Init exporter")
+	log.Infof("init exporter")
 	exporter := PagerdutyElasticsearchExporter{}
 	exporter.Init()
 	exporter.SetScrapeTime(opts.ScrapeTime)
-	exporter.SetPagerdutyDateRange(opts.PagerDutySince)
+	exporter.SetPagerdutyDateRange(opts.PagerDuty.Since)
 	exporter.ConnectPagerduty(
-		opts.PagerDutyAuthToken,
+		opts.PagerDuty.AuthToken,
 		&http.Client{
 			Transport: &http.Transport{
 				Proxy: http.ProxyFromEnvironment,
@@ -80,8 +52,8 @@ func main() {
 					Timeout:   30 * time.Second,
 					KeepAlive: 30 * time.Second,
 				}).DialContext,
-				MaxConnsPerHost:       opts.PagerDutyMaxConnections,
-				MaxIdleConns:          opts.PagerDutyMaxConnections,
+				MaxConnsPerHost:       opts.PagerDuty.MaxConnections,
+				MaxIdleConns:          opts.PagerDuty.MaxConnections,
 				IdleConnTimeout:       60 * time.Second,
 				TLSHandshakeTimeout:   10 * time.Second,
 				ExpectContinueTimeout: 1 * time.Second,
@@ -91,29 +63,29 @@ func main() {
 	)
 
 	cfg := elasticsearch.Config{
-		Addresses: opts.ElasticsearchAddresses,
-		Username:  opts.ElasticsearchUsername,
-		Password:  opts.ElasticsearchPassword,
-		APIKey:    opts.ElasticsearchApiKey,
+		Addresses: opts.Elasticsearch.Addresses,
+		Username:  opts.Elasticsearch.Username,
+		Password:  opts.Elasticsearch.Password,
+		APIKey:    opts.Elasticsearch.ApiKey,
 		Transport: &http.Transport{
 			Proxy: http.ProxyFromEnvironment,
 		},
 	}
-	exporter.ConnectElasticsearch(cfg, opts.ElasticsearchIndex)
-	exporter.SetElasticsearchBatchCount(opts.ElasticsearchBatchCount)
-	exporter.SetElasticsearchRetry(opts.ElasticsearchRetryCount, opts.ElasticsearchRetryDelay)
+	exporter.ConnectElasticsearch(cfg, opts.Elasticsearch.Index)
+	exporter.SetElasticsearchBatchCount(opts.Elasticsearch.BatchCount)
+	exporter.SetElasticsearchRetry(opts.Elasticsearch.RetryCount, opts.Elasticsearch.RetryDelay)
 
 	if opts.ScrapeTime.Seconds() > 0 {
-		daemonLogger.Infof("Starting daemon run")
+		log.Infof("starting daemon run")
 		exporter.RunDaemon()
 
 		// daemon mode
-		daemonLogger.Infof("Starting http server on %s", opts.ServerBind)
+		log.Infof("starting http server on %s", opts.ServerBind)
 		startHttpServer()
 	} else {
-		daemonLogger.Infof("Starting single run")
+		log.Infof("starting single run")
 		exporter.RunSingle()
-		daemonLogger.Infof("completed single run")
+		log.Infof("completed single run")
 	}
 }
 
@@ -132,6 +104,37 @@ func initArgparser() {
 			os.Exit(1)
 		}
 	}
+
+	// verbose level
+	if opts.Logger.Verbose {
+		log.SetLevel(log.DebugLevel)
+	}
+
+	// debug level
+	if opts.Logger.Debug {
+		log.SetReportCaller(true)
+		log.SetLevel(log.TraceLevel)
+		log.SetFormatter(&log.TextFormatter{
+			CallerPrettyfier: func(f *runtime.Frame) (string, string) {
+				s := strings.Split(f.Function, ".")
+				funcName := s[len(s)-1]
+				return funcName, fmt.Sprintf("%s:%d", path.Base(f.File), f.Line)
+			},
+		})
+	}
+
+	// json log format
+	if opts.Logger.LogJson {
+		log.SetReportCaller(true)
+		log.SetFormatter(&log.JSONFormatter{
+			DisableTimestamp: true,
+			CallerPrettyfier: func(f *runtime.Frame) (string, string) {
+				s := strings.Split(f.Function, ".")
+				funcName := s[len(s)-1]
+				return funcName, fmt.Sprintf("%s:%d", path.Base(f.File), f.Line)
+			},
+		})
+	}
 }
 
 // start and handle prometheus handler
@@ -139,10 +142,10 @@ func startHttpServer() {
 	// healthz
 	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		if _, err := fmt.Fprint(w, "Ok"); err != nil {
-			daemonLogger.Error(err)
+			log.Error(err)
 		}
 	})
 
 	http.Handle("/metrics", promhttp.Handler())
-	daemonLogger.Fatal(http.ListenAndServe(opts.ServerBind, nil))
+	log.Fatal(http.ListenAndServe(opts.ServerBind, nil))
 }

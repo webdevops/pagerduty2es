@@ -1,3 +1,3 @@
 /vendor/
-/pagerduty2elasticsearch-exporter
+/pagerduty2es
 *.exe

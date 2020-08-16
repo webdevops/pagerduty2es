@@ -8,6 +8,7 @@ import (
 	elasticsearch "github.com/elastic/go-elasticsearch/v7"
 	esapi "github.com/elastic/go-elasticsearch/v7/esapi"
 	"github.com/prometheus/client_golang/prometheus"
+	log "github.com/sirupsen/logrus"
 	"net/http"
 	"strings"
 	"sync"
@@ -107,7 +108,7 @@ func (e *PagerdutyElasticsearchExporter) SetScrapeTime(value time.Duration) {
 }
 
 func (e *PagerdutyElasticsearchExporter) ConnectPagerduty(token string, httpClient *http.Client) {
-	e.pagerdutyClient = pagerduty.NewClient(opts.PagerDutyAuthToken)
+	e.pagerdutyClient = pagerduty.NewClient(token)
 	e.pagerdutyClient.HTTPClient = httpClient
 }
 
@@ -130,7 +131,7 @@ func (e *PagerdutyElasticsearchExporter) ConnectElasticsearch(cfg elasticsearch.
 			if tries >= 5 {
 				panic(err)
 			} else {
-				daemonLogger.Info("Failed to connect to ES, retry...")
+				log.Info("failed to connect to ES, retry...")
 				time.Sleep(5 * time.Second)
 				continue
 			}
@@ -165,13 +166,13 @@ func (e *PagerdutyElasticsearchExporter) RunDaemon() {
 }
 
 func (e *PagerdutyElasticsearchExporter) sleepUntilNextCollection() {
-	daemonLogger.Verbosef("sleeping %v", e.scrapeTime)
+	log.Debugf("sleeping %v", e.scrapeTime)
 	time.Sleep(*e.scrapeTime)
 }
 
 func (e *PagerdutyElasticsearchExporter) runScrape() {
 	var wgProcess sync.WaitGroup
-	daemonLogger.Verbosef("Starting scraping")
+	log.Info("starting scrape")
 
 	since := time.Now().Add(-*e.pagerdutyDateRange).Format(time.RFC3339)
 	listOpts := pagerduty.ListIncidentsOptions{
@@ -216,7 +217,7 @@ func (e *PagerdutyElasticsearchExporter) runScrape() {
 				incident.Id = incident.ID
 			}
 
-			daemonLogger.Verbosef(" - Incident %v", incident.Id)
+			log.Debugf(" - incident %v", incident.Id)
 			e.indexIncident(incident, esIndexRequestChannel)
 
 			listLogOpts := pagerduty.ListIncidentLogEntriesOptions{}
@@ -226,7 +227,7 @@ func (e *PagerdutyElasticsearchExporter) runScrape() {
 			}
 
 			for _, logEntry := range incidentLogResponse.LogEntries {
-				daemonLogger.Verbosef("   - LogEntry %v", logEntry.ID)
+				log.Debugf("   - logEntry %v", logEntry.ID)
 				e.indexIncidentLogEntry(incident, logEntry, esIndexRequestChannel)
 			}
 		}
@@ -242,7 +243,7 @@ func (e *PagerdutyElasticsearchExporter) runScrape() {
 
 	duration := time.Now().Sub(startTime)
 	e.prometheus.duration.WithLabelValues().Set(duration.Seconds())
-	daemonLogger.Verbosef("processing took %v", duration.String())
+	log.WithField("duration", duration.String()).Info("finished scraping")
 }
 
 func (e *PagerdutyElasticsearchExporter) indexIncident(incident pagerduty.Incident, callback chan<- *esapi.IndexRequest) {
@@ -357,11 +358,11 @@ func (e *PagerdutyElasticsearchExporter) doESIndexRequestBulk(bulkRequests []*es
 		}
 
 		if resp != nil {
-			daemonLogger.Errorf("Unexpected HTTP %v response: %v", resp.StatusCode, resp.String())
+			log.Errorf("Unexpected HTTP %v response: %v", resp.StatusCode, resp.String())
 		}
 
 		// got an error
-		daemonLogger.Errorf("Retrying ES index error: %v", err)
+		log.Errorf("Retrying ES index error: %v", err)
 		e.prometheus.esRequestRetries.WithLabelValues().Inc()
 
 		// wait until retry

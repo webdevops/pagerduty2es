@@ -1,6 +1,6 @@
 .PHONY: all build clean image check vendor dependencies
 
-NAME				:= pagerduty2elasticsearch-exporter
+NAME				:= pagerduty2es
 GIT_TAG				:= $(shell git describe --dirty --tags --always)
 GIT_COMMIT			:= $(shell git rev-parse --short HEAD)
 LDFLAGS             := -X "main.gitTag=$(GIT_TAG)" -X "main.gitCommit=$(GIT_COMMIT)" -extldflags "-static"
