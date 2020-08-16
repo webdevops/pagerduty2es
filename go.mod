@@ -1,6 +1,6 @@
 module github.com/webdevops/pagerduty2elasticsearch-exporter
 
-go 1.14
+go 1.15
 
 require (
 	github.com/PagerDuty/go-pagerduty v1.2.0
