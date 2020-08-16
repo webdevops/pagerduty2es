@@ -5,7 +5,8 @@ WORKDIR /go/src/github.com/webdevops/pagerduty2elasticsearch-exporter
 # Get deps (cached)
 COPY ./go.mod /go/src/github.com/webdevops/pagerduty2elasticsearch-exporter
 COPY ./go.sum /go/src/github.com/webdevops/pagerduty2elasticsearch-exporter
-RUN go mod download
+COPY ./Makefile /go/src/github.com/webdevops/alertmanager2es
+RUN make dependencies
 
 # Compile
 COPY ./ /go/src/github.com/webdevops/pagerduty2elasticsearch-exporter
