@@ -2,8 +2,8 @@ PagerDuty2es (elasticsearch) exporter
 =====================================
 
 [![license](https://img.shields.io/github/license/webdevops/pagerduty2es.svg)](https://github.com/webdevops/pagerduty2es/blob/master/LICENSE)
-[![Docker](https://img.shields.io/docker/cloud/automated/webdevops/pagerduty2es)](https://hub.docker.com/r/webdevops/pagerduty2es/)
-[![Docker Build Status](https://img.shields.io/docker/cloud/build/webdevops/pagerduty2es)](https://hub.docker.com/r/webdevops/pagerduty2es/)
+[![DockerHub](https://img.shields.io/badge/DockerHub-webdevops%2Fpagerduty2es-blue)](https://hub.docker.com/r/webdevops/pagerduty2es/)
+[![Quay.io](https://img.shields.io/badge/Quay.io-webdevops%2Fpagerduty2es-blue)](https://quay.io/repository/webdevops/pagerduty2es)
 
 Exporter for incidents and logentries from PagerDuty to ElasticSearch
 
