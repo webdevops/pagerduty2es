@@ -217,7 +217,9 @@ func (e *PagerdutyElasticsearchExporter) runScrape() {
 				incident.Id = incident.ID
 			}
 
-			log.Debugf(" - incident %v", incident.Id)
+			contextLogger := log.WithField("incident", incident.Id)
+
+			contextLogger.Debugf("incident %v", incident.Id)
 			e.indexIncident(incident, esIndexRequestChannel)
 
 			listLogOpts := pagerduty.ListIncidentLogEntriesOptions{}
@@ -227,7 +229,7 @@ func (e *PagerdutyElasticsearchExporter) runScrape() {
 			}
 
 			for _, logEntry := range incidentLogResponse.LogEntries {
-				log.Debugf("   - logEntry %v", logEntry.ID)
+				contextLogger.WithField("logEntry", logEntry.ID).Debugf("logEntry %v", logEntry.ID)
 				e.indexIncidentLogEntry(incident, logEntry, esIndexRequestChannel)
 			}
 		}
@@ -358,11 +360,11 @@ func (e *PagerdutyElasticsearchExporter) doESIndexRequestBulk(bulkRequests []*es
 		}
 
 		if resp != nil {
-			log.Errorf("Unexpected HTTP %v response: %v", resp.StatusCode, resp.String())
+			log.Errorf("unexpected HTTP %v response: %v", resp.StatusCode, resp.String())
 		}
 
 		// got an error
-		log.Errorf("Retrying ES index error: %v", err)
+		log.Errorf("retrying ES index error: %v", err)
 		e.prometheus.esRequestRetries.WithLabelValues().Inc()
 
 		// wait until retry
@@ -371,7 +373,7 @@ func (e *PagerdutyElasticsearchExporter) doESIndexRequestBulk(bulkRequests []*es
 
 	// must be an error
 	if err != nil {
-		panic("Fatal ES index error: " + err.Error())
+		log.Panicf("fatal ES index error: %v", err)
 	} else {
 		panic("Unable to process ES request")
 	}
