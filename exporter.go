@@ -241,7 +241,7 @@ func (e *PagerdutyElasticsearchExporter) runScrape() {
 
 	wgProcess.Wait()
 
-	duration := time.Now().Sub(startTime)
+	duration := time.Since(startTime)
 	e.prometheus.duration.WithLabelValues().Set(duration.Seconds())
 	log.WithField("duration", duration.String()).Info("finished scraping")
 }
