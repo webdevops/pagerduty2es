@@ -2,11 +2,6 @@ package main
 
 import (
 	"fmt"
-	elasticsearch "github.com/elastic/go-elasticsearch/v7"
-	"github.com/jessevdk/go-flags"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	log "github.com/sirupsen/logrus"
-	"github.com/webdevops/pagerduty2es/config"
 	"net"
 	"net/http"
 	"os"
@@ -14,6 +9,13 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	elasticsearch "github.com/elastic/go-elasticsearch/v7"
+	"github.com/jessevdk/go-flags"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	log "github.com/sirupsen/logrus"
+
+	"github.com/webdevops/pagerduty2es/config"
 )
 
 const (

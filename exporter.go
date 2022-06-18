@@ -2,17 +2,19 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/PagerDuty/go-pagerduty"
 	elasticsearch "github.com/elastic/go-elasticsearch/v7"
 	esapi "github.com/elastic/go-elasticsearch/v7/esapi"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
-	"net/http"
-	"strings"
-	"sync"
-	"time"
 )
 
 type (
@@ -206,24 +208,21 @@ func (e *PagerdutyElasticsearchExporter) runScrape() {
 	}()
 
 	for {
-		incidentResponse, err := e.pagerdutyClient.ListIncidents(listOpts)
+		ctx := context.Background()
+		incidentResponse, err := e.pagerdutyClient.ListIncidentsWithContext(ctx, listOpts)
 		if err != nil {
 			panic(err)
 		}
 
 		for _, incident := range incidentResponse.Incidents {
 			// workaround for https://github.com/PagerDuty/go-pagerduty/issues/218
-			if incident.Id == "" {
-				incident.Id = incident.ID
-			}
+			contextLogger := log.WithField("incident", incident.ID)
 
-			contextLogger := log.WithField("incident", incident.Id)
-
-			contextLogger.Debugf("incident %v", incident.Id)
+			contextLogger.Debugf("incident %v", incident.ID)
 			e.indexIncident(incident, esIndexRequestChannel)
 
 			listLogOpts := pagerduty.ListIncidentLogEntriesOptions{}
-			incidentLogResponse, err := e.pagerdutyClient.ListIncidentLogEntries(incident.Id, listLogOpts)
+			incidentLogResponse, err := e.pagerdutyClient.ListIncidentLogEntriesWithContext(ctx, incident.ID, listLogOpts)
 			if err != nil {
 				panic(err)
 			}
@@ -258,14 +257,14 @@ func (e *PagerdutyElasticsearchExporter) indexIncident(incident pagerduty.Incide
 
 	esIncident := ElasticsearchIncident{
 		Timestamp:  createTime.Format(time.RFC3339),
-		IncidentId: incident.Id,
+		IncidentId: incident.ID,
 		Incident:   &incident,
 	}
 	incidentJson, _ := json.Marshal(esIncident)
 
 	req := esapi.IndexRequest{
 		Index:      e.buildIndexName(createTime),
-		DocumentID: fmt.Sprintf("incident-%v", incident.Id),
+		DocumentID: fmt.Sprintf("incident-%v", incident.ID),
 		Body:       bytes.NewReader(incidentJson),
 	}
 	callback <- &req
@@ -291,7 +290,7 @@ func (e *PagerdutyElasticsearchExporter) indexIncidentLogEntry(incident pagerdut
 
 	esLogEntry := ElasticsearchIncidentLog{
 		Timestamp:  createTime.Format(time.RFC3339),
-		IncidentId: incident.Id,
+		IncidentId: incident.ID,
 		LogEntry:   &logEntry,
 	}
 	logEntryJson, _ := json.Marshal(esLogEntry)
