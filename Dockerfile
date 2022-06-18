@@ -1,24 +1,38 @@
-FROM golang:1.15 as build
+#############################################
+# Build
+#############################################
+FROM --platform=$BUILDPLATFORM golang:1.18-alpine as build
+
+RUN apk upgrade --no-cache --force
+RUN apk add --update build-base make git
 
 WORKDIR /go/src/github.com/webdevops/pagerduty2es
 
-# Get deps (cached)
-COPY ./go.mod /go/src/github.com/webdevops/pagerduty2es
-COPY ./go.sum /go/src/github.com/webdevops/pagerduty2es
-COPY ./Makefile /go/src/github.com/webdevops/pagerduty2es
-RUN make dependencies
+# Dependencies
+COPY go.mod go.sum .
+RUN go mod download
 
 # Compile
-COPY ./ /go/src/github.com/webdevops/pagerduty2es
+COPY . .
 RUN make test
-RUN make lint
-RUN make build
-RUN ./pagerduty2es --help
+ARG TARGETOS TARGETARCH
+RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} make build
 
 #############################################
-# FINAL IMAGE
+# Test
+#############################################
+FROM gcr.io/distroless/static as test
+USER 0:0
+WORKDIR /app
+COPY --from=build /go/src/github.com/webdevops/pagerduty2es/pagerduty2es .
+RUN ["./pagerduty2es", "--help"]
+
+#############################################
+# Final
 #############################################
 FROM gcr.io/distroless/static
-COPY --from=build /go/src/github.com/webdevops/pagerduty2es/pagerduty2es /
-USER 1000
+ENV LOG_JSON=1
+WORKDIR /
+COPY --from=test /app .
+USER 1000:1000
 ENTRYPOINT ["/pagerduty2es"]
