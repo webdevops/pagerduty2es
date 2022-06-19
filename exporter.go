@@ -352,7 +352,9 @@ func (e *PagerdutyElasticsearchExporter) doESIndexRequestBulk(bulkRequests []*es
 		e.prometheus.esRequestTotal.WithLabelValues().Inc()
 		resp, err = e.elasticSearchClient.Bulk(bytes.NewReader(buf.Bytes()))
 		if err == nil && resp.StatusCode == http.StatusOK {
-			resp.Body.Close()
+			if err := resp.Body.Close(); err != nil {
+				log.Errorf(err.Error())
+			}
 
 			// success
 			return
