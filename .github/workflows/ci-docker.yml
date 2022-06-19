@@ -1,4 +1,4 @@
-name: "pull request"
+name: "CI docker"
 
 on: [pull_request, workflow_dispatch]
 
@@ -40,6 +40,5 @@ jobs:
           file: ./Dockerfile
           push: false
           platforms: linux/amd64,linux/arm,linux/arm64
-          push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.docker_meta.outputs.tags }}
           labels: ${{ steps.docker_meta.outputs.labels }}
