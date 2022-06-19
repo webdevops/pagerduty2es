@@ -35,6 +35,7 @@ var (
 )
 
 func main() {
+	os.Exit(1)
 	initArgparser()
 
 	log.Infof("starting pagerduty2es v%s (%s; %s; by %v)", gitTag, gitCommit, runtime.Version(), author)
